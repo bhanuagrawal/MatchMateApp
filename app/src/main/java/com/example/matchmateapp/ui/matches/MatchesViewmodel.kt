@@ -2,6 +2,7 @@ package com.example.matchmateapp.ui.matches
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.matchmate.domain.ConnectivityObserver
 import com.example.matchmate.domain.MatchRepository
 import com.example.matchmateapp.common.EventResult
 import com.example.matchmateapp.common.SideEffect
@@ -16,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.scan
@@ -27,6 +30,7 @@ class MatchesViewmodel
 @Inject
 constructor(
     private val repository: MatchRepository,
+    private val connectivityObserver: ConnectivityObserver,
     private val loadEventHandler: MatchesLoadEventHandler,
     private val loadMoreEventHandler: MatchesLoadMoreEventHandler,
     private val refreshEventHandler: MatchesRefreshEventHandler,
@@ -40,7 +44,7 @@ constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<MatchesUiState> =
-        events
+        merge(events, connectivityObserver.isBackOnline.map { MatchesEvent.Refresh })
             .onStart { emit(MatchesEvent.Load) }
             .flatMapMerge { handleEvent(it) }
             .onEach { result ->

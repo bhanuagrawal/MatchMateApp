@@ -14,7 +14,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 
-private const val PAGE_SIZE = 10
+private const val NETWORK_FETCH_SIZE = 10
 private const val FIRST_PAGE = 1
 
 class MatchRepositoryImpl
@@ -25,8 +25,6 @@ constructor(
   private val decisionDao: DecisionDao,
 ) : MatchRepository {
 
-  // Decisions live in their own table so clearing/re-fetching the matches cache
-  // (syncCache, refreshMatches) never wipes what the user already decided.
   override val matches: Flow<List<Match>> =
     combine(dao.observeAll(), decisionDao.observeAll()) { entities, decisions ->
       val decisionByUserId = decisions.associate { it.userId to Decision.valueOf(it.decision) }
@@ -34,9 +32,10 @@ constructor(
     }
 
   override suspend fun loadNextPage(): Result<Boolean> = tryCatch {
-    val nextPage = dao.count() / PAGE_SIZE + 1
-    val response = api.getUsers(page = nextPage, results = PAGE_SIZE)
-    dao.insertAll(response.results.map { toEntity(it, nextPage) })
+    val startSequence = dao.count()
+    val nextPage = startSequence / NETWORK_FETCH_SIZE + 1
+    val response = api.getUsers(page = nextPage, results = NETWORK_FETCH_SIZE)
+    dao.insertAll(response.results.mapIndexed { index, dto -> toEntity(dto, startSequence + index) })
     response.results.isEmpty()
   }
 
@@ -44,27 +43,22 @@ constructor(
     if (dao.count() == 0) {
       loadNextPage().getOrThrow()
     } else {
-      val cachedFirstPageIds = dao.getPage(FIRST_PAGE).map { it.id }.toSet()
-      val response = api.getUsers(page = FIRST_PAGE, results = PAGE_SIZE)
-      val freshFirstPageIds = response.results.map { it.login.uuid }.toSet()
+      val cachedFirstIds = dao.getFirst(NETWORK_FETCH_SIZE).map { it.id }.toSet()
+      val response = api.getUsers(page = FIRST_PAGE, results = NETWORK_FETCH_SIZE)
+      val freshFirstIds = response.results.map { it.login.uuid }.toSet()
 
-      // No version/etag from this API to check staleness against, so page 1's
-      // content itself is the fingerprint: unchanged -> trust the cache as-is,
-      // changed -> the whole page ordering underneath us shifted, so start over.
-      if (freshFirstPageIds != cachedFirstPageIds) {
+      if (freshFirstIds != cachedFirstIds) {
         dao.deleteAll()
-        dao.insertAll(response.results.map { toEntity(it, FIRST_PAGE) })
+        dao.insertAll(response.results.mapIndexed { index, dto -> toEntity(dto, index) })
       }
     }
     Unit
   }
 
   override suspend fun refreshMatches(): Result<Boolean> = tryCatch {
-    // Fetch before clearing: if this fails (e.g. no connection), the existing
-    // cache must stay intact instead of leaving the user with an empty list.
-    val response = api.getUsers(page = FIRST_PAGE, results = PAGE_SIZE)
+    val response = api.getUsers(page = FIRST_PAGE, results = NETWORK_FETCH_SIZE)
     dao.deleteAll()
-    dao.insertAll(response.results.map { toEntity(it, FIRST_PAGE) })
+    dao.insertAll(response.results.mapIndexed { index, dto -> toEntity(dto, index) })
     response.results.isEmpty()
   }
 
@@ -72,10 +66,10 @@ constructor(
     decisionDao.upsert(DecisionEntity(userId = id, decision = decision.name, timestamp = System.currentTimeMillis()))
   }
 
-  private fun toEntity(dto: UserDto, page: Int) =
+  private fun toEntity(dto: UserDto, sequence: Int) =
     MatchEntity(
       id = dto.login.uuid,
-      page = page,
+      sequence = sequence,
       name = "${dto.name.first} ${dto.name.last}",
       age = dto.dob.age,
       location = "${dto.location.city}, ${dto.location.state}",
