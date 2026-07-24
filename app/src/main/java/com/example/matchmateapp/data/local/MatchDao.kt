@@ -20,9 +20,6 @@ interface MatchDao {
   @Insert(onConflict = OnConflictStrategy.IGNORE)
   suspend fun insertAll(matches: List<MatchEntity>)
 
-  @Query("UPDATE matches SET decision = :decision WHERE id = :id")
-  suspend fun updateDecision(id: String, decision: String)
-
   @Query("DELETE FROM matches")
   suspend fun deleteAll()
 }

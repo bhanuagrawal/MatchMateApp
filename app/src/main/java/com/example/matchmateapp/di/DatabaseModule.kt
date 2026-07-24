@@ -2,6 +2,7 @@ package com.example.matchmate.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.matchmate.datalayer.local.DecisionDao
 import com.example.matchmate.datalayer.local.MatchDao
 import com.example.matchmate.datalayer.local.MatchMateDatabase
 import dagger.Module
@@ -18,7 +19,11 @@ object DatabaseModule {
   @Provides
   @Singleton
   fun provideDatabase(@ApplicationContext context: Context): MatchMateDatabase =
-    Room.databaseBuilder(context, MatchMateDatabase::class.java, "matchmate.db").build()
+    Room.databaseBuilder(context, MatchMateDatabase::class.java, "matchmate.db")
+      .fallbackToDestructiveMigration(true)
+      .build()
 
   @Provides fun provideMatchDao(database: MatchMateDatabase): MatchDao = database.matchDao()
+
+  @Provides fun provideDecisionDao(database: MatchMateDatabase): DecisionDao = database.decisionDao()
 }

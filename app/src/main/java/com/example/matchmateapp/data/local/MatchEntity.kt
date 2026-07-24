@@ -11,5 +11,4 @@ data class MatchEntity(
   val age: Int,
   val location: String,
   val pictureUrl: String,
-  val decision: String,
 )

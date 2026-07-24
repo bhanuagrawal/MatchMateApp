@@ -1,5 +1,7 @@
 package com.example.matchmate.datalayer
 
+import com.example.matchmate.datalayer.local.DecisionDao
+import com.example.matchmate.datalayer.local.DecisionEntity
 import com.example.matchmate.datalayer.local.MatchDao
 import com.example.matchmate.datalayer.local.MatchEntity
 import com.example.matchmate.datalayer.remote.RandomUserApi
@@ -10,16 +12,26 @@ import com.example.matchmateapp.domain.Match
 import com.example.matchmateapp.tryCatch
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 
 private const val PAGE_SIZE = 10
 private const val FIRST_PAGE = 1
 
 class MatchRepositoryImpl
 @Inject
-constructor(private val api: RandomUserApi, private val dao: MatchDao) : MatchRepository {
+constructor(
+  private val api: RandomUserApi,
+  private val dao: MatchDao,
+  private val decisionDao: DecisionDao,
+) : MatchRepository {
 
-  override val matches: Flow<List<Match>> = dao.observeAll().map { entities -> entities.map(::toMatch) }
+  // Decisions live in their own table so clearing/re-fetching the matches cache
+  // (syncCache, refreshMatches) never wipes what the user already decided.
+  override val matches: Flow<List<Match>> =
+    combine(dao.observeAll(), decisionDao.observeAll()) { entities, decisions ->
+      val decisionByUserId = decisions.associate { it.userId to Decision.valueOf(it.decision) }
+      entities.map { entity -> toMatch(entity, decisionByUserId[entity.id] ?: Decision.NONE) }
+    }
 
   override suspend fun loadNextPage(): Result<Boolean> = tryCatch {
     val nextPage = dao.count() / PAGE_SIZE + 1
@@ -57,7 +69,7 @@ constructor(private val api: RandomUserApi, private val dao: MatchDao) : MatchRe
   }
 
   override suspend fun updateDecision(id: String, decision: Decision) {
-    dao.updateDecision(id, decision.name)
+    decisionDao.upsert(DecisionEntity(userId = id, decision = decision.name, timestamp = System.currentTimeMillis()))
   }
 
   private fun toEntity(dto: UserDto, page: Int) =
@@ -68,16 +80,15 @@ constructor(private val api: RandomUserApi, private val dao: MatchDao) : MatchRe
       age = dto.dob.age,
       location = "${dto.location.city}, ${dto.location.state}",
       pictureUrl = dto.picture.large,
-      decision = Decision.NONE.name,
     )
 
-  private fun toMatch(entity: MatchEntity) =
+  private fun toMatch(entity: MatchEntity, decision: Decision) =
     Match(
       id = entity.id,
       name = entity.name,
       age = entity.age,
       location = entity.location,
       pictureUrl = entity.pictureUrl,
-      decision = Decision.valueOf(entity.decision),
+      decision = decision,
     )
 }
