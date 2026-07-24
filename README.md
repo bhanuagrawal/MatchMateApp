@@ -17,6 +17,10 @@ Kotlin, Jetpack Compose, Hilt, Retrofit + OkHttp, Room, Coil, Kotlin Flow/StateF
 
 Used Compose + Flow instead of RecyclerView + LiveData, and Coil instead of Glide/Picasso — the more current equivalents for a Compose-first app.
 
+## Architecture
+
+Clean Architecture layers (`domain` / `data` / `ui`), MVI on the UI side — screen state is a single `MatchesUiState`, and things that happen (load, load more, refresh, accept/decline) are events fed through small per-event handlers that turn them into a state update or a one-off effect like a snackbar.
+
 ## Running it
 
 Open in Android Studio, sync Gradle, run on a device/emulator with API 24+. No API key needed.
