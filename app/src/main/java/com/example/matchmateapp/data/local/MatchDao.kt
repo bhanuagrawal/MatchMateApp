@@ -14,9 +14,15 @@ interface MatchDao {
   @Query("SELECT COUNT(*) FROM matches")
   suspend fun count(): Int
 
+  @Query("SELECT * FROM matches WHERE page = :page")
+  suspend fun getPage(page: Int): List<MatchEntity>
+
   @Insert(onConflict = OnConflictStrategy.IGNORE)
   suspend fun insertAll(matches: List<MatchEntity>)
 
   @Query("UPDATE matches SET decision = :decision WHERE id = :id")
   suspend fun updateDecision(id: String, decision: String)
+
+  @Query("DELETE FROM matches")
+  suspend fun deleteAll()
 }
