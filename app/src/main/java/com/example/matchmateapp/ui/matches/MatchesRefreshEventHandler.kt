@@ -1,11 +1,11 @@
 package com.example.matchmateapp.ui.matches
 
 import com.example.matchmate.domain.MatchRepository
+import com.example.matchmateapp.common.DispatcherProvider
 import com.example.matchmateapp.common.EventHandler
 import com.example.matchmateapp.common.EventResult
 import com.example.matchmateapp.common.SideEffect
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -13,8 +13,10 @@ import kotlinx.coroutines.flow.flowOn
 
 class MatchesRefreshEventHandler
 @Inject
-constructor(private val repository: MatchRepository) :
-    EventHandler<MatchesEvent.Refresh, MatchesUiState> {
+constructor(
+    private val repository: MatchRepository,
+    private val dispatcherProvider: DispatcherProvider,
+) : EventHandler<MatchesEvent.Refresh, MatchesUiState> {
 
     override fun handleEvent(
         event: MatchesEvent.Refresh,
@@ -25,13 +27,9 @@ constructor(private val repository: MatchRepository) :
 
             emit(EventResult.UpdateState<MatchesUiState> { copy(isRefreshing = true) })
 
-            val result = repository.refreshMatches()
+            val result = repository.syncCache()
 
-            emit(
-                EventResult.UpdateState<MatchesUiState> {
-                    copy(isRefreshing = false, isError = false, reachedEnd = result.getOrDefault(reachedEnd))
-                },
-            )
+            emit(EventResult.UpdateState<MatchesUiState> { copy(isRefreshing = false, isError = false, reachedEnd = false) })
 
             result.onFailure { throwable ->
                 emit(
@@ -42,5 +40,5 @@ constructor(private val repository: MatchRepository) :
             }
         }.catch { throwable ->
             emit(EventResult.UpdateState<MatchesUiState> { copy(isRefreshing = false, isError = true, error = throwable) })
-        }.flowOn(Dispatchers.IO)
+        }.flowOn(dispatcherProvider.default)
 }

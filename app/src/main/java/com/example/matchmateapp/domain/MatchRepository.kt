@@ -11,6 +11,5 @@ interface MatchRepository {
 
   suspend fun syncCache(): Result<Unit>
 
-  suspend fun refreshMatches(): Result<Boolean>
   suspend fun updateDecision(id: String, decision: Decision)
 }

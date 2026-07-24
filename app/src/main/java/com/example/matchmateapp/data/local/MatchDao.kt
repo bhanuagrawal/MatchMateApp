@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -22,4 +23,10 @@ interface MatchDao {
 
   @Query("DELETE FROM matches")
   suspend fun deleteAll()
+
+  @Transaction
+  suspend fun replaceAll(matches: List<MatchEntity>) {
+    deleteAll()
+    insertAll(matches)
+  }
 }

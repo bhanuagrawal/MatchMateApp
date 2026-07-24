@@ -48,18 +48,10 @@ constructor(
       val freshFirstIds = response.results.map { it.login.uuid }.toSet()
 
       if (freshFirstIds != cachedFirstIds) {
-        dao.deleteAll()
-        dao.insertAll(response.results.mapIndexed { index, dto -> toEntity(dto, index) })
+        dao.replaceAll(response.results.mapIndexed { index, dto -> toEntity(dto, index) })
       }
     }
     Unit
-  }
-
-  override suspend fun refreshMatches(): Result<Boolean> = tryCatch {
-    val response = api.getUsers(page = FIRST_PAGE, results = NETWORK_FETCH_SIZE)
-    dao.deleteAll()
-    dao.insertAll(response.results.mapIndexed { index, dto -> toEntity(dto, index) })
-    response.results.isEmpty()
   }
 
   override suspend fun updateDecision(id: String, decision: Decision) {
