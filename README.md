@@ -1,6 +1,6 @@
 # MatchMate
 
-A small matrimonial-style matching app built for a take-home assignment. Shows profile cards (photo, name, age, location) with Accept/Decline actions, using randomuser.me for profile data.
+A small matrimonial-style matching app. Shows profile cards (photo, name, age, location) with Accept/Decline actions, using randomuser.me for profile data.
 
 ## Features
 
